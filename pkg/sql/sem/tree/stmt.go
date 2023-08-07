@@ -877,6 +877,12 @@ func (*UnionClause) StatementType() StatementType { return Rows }
 func (*UnionClause) StatementTag() string { return "UNION" }
 
 // StatementType implements the Statement interface.
+func (*LazySelectUnionClause) StatementType() StatementType { return Rows }
+
+// StatementTag returns a short string identifying the type of statement.
+func (*LazySelectUnionClause) StatementTag() string { return "LAZY SELECT UNION" }
+
+// StatementType implements the Statement interface.
 func (*ValuesClause) StatementType() StatementType { return Rows }
 
 // StatementTag returns a short string identifying the type of statement.
@@ -993,5 +999,6 @@ func (n *Split) String() string                          { return AsString(n) }
 func (n *Unsplit) String() string                        { return AsString(n) }
 func (n *Truncate) String() string                       { return AsString(n) }
 func (n *UnionClause) String() string                    { return AsString(n) }
+func (n *LazySelectUnionClause) String() string          { return AsString(n) }
 func (n *Update) String() string                         { return AsString(n) }
 func (n *ValuesClause) String() string                   { return AsString(n) }

@@ -257,6 +257,8 @@ func (w sqlWalker) Transform(s string, i int) (out string, ok bool, err error) {
 			case *tree.UniqueConstraintTableDef:
 			case *tree.UnionClause:
 				walk(node.Left, node.Right)
+			case *tree.LazySelectUnionClause:
+				walk(node.Left, node.Right)
 			case tree.UnqualifiedStar:
 			case *tree.UnresolvedName:
 			case *tree.ValuesClause:

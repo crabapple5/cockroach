@@ -1336,6 +1336,14 @@ func (node *UnionClause) doc(p *PrettyCfg) pretty.Doc {
 	return pretty.Stack(p.Doc(node.Left), p.nestUnder(pretty.Keyword(op), p.Doc(node.Right)))
 }
 
+func (node *LazySelectUnionClause) doc(p *PrettyCfg) pretty.Doc {
+	op := node.Type.String()
+	if node.All {
+		op += " ALL"
+	}
+	return pretty.Stack(p.Doc(node.Left), p.nestUnder(pretty.Keyword(op), p.Doc(node.Right)))
+}
+
 func (node *IfErrExpr) doc(p *PrettyCfg) pretty.Doc {
 	var s string
 	if node.Else != nil {

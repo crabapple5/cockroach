@@ -241,7 +241,7 @@ func (opc *optPlanningCtx) reset() {
 	// surface of potential issues (conditions we need to detect to invalidate a
 	// cached memo).
 	switch p.stmt.AST.(type) {
-	case *tree.ParenSelect, *tree.Select, *tree.SelectClause, *tree.UnionClause, *tree.ValuesClause,
+	case *tree.ParenSelect, *tree.Select, *tree.SelectClause, *tree.UnionClause, *tree.LazySelectUnionClause, *tree.ValuesClause,
 		*tree.Insert, *tree.Update, *tree.Delete, *tree.CannedOptPlan:
 		// If the current transaction has uncommitted DDL statements, we cannot rely
 		// on descriptor versions for detecting a "stale" memo. This is because

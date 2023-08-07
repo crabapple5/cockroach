@@ -820,7 +820,7 @@ func newNameFromStr(s string) *tree.Name {
 %type <*tree.LockingItem> for_locking_item
 %type <tree.LockingStrength> for_locking_strength
 %type <tree.LockingWaitPolicy> opt_nowait_or_skip
-%type <tree.SelectStatement> set_operation
+%type <tree.SelectStatement> set_operation lazy_select
 
 %type <tree.Expr> alter_column_default
 %type <tree.Direction> opt_asc_desc
@@ -6258,6 +6258,7 @@ simple_select:
 | values_clause        // EXTEND WITH HELP: VALUES
 | table_clause         // EXTEND WITH HELP: TABLE
 | set_operation
+| lazy_select
 
 // %Help: SELECT - retrieve rows from a data source and compute a result
 // %Category: DML
@@ -6343,6 +6344,22 @@ set_operation:
     $$.val = &tree.UnionClause{
       Type:  tree.ExceptOp,
       Left:  &tree.Select{Select: $1.selectStmt()},
+      Right: &tree.Select{Select: $4.selectStmt()},
+      All:   $3.bool(),
+    }
+  }
+
+lazy_select:
+  opt_with_clause INSERT INTO insert_target insert_rest on_conflict returning_clause UNION all_or_distinct select_clause
+  {
+    $$.val = &tree.LazySelectUnionClause{
+      Type:  tree.UnionOp,
+      Left:  &tree.Insert{
+        With: $1.with(),
+        Table: $4.tblExpr(),
+        OnConflict: $6.onConflict(),
+        Returning: $7.retClause()
+      },
       Right: &tree.Select{Select: $4.selectStmt()},
       All:   $3.bool(),
     }
