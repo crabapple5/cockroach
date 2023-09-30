@@ -16,6 +16,7 @@ stmt ::=
 	| release_stmt
 	| nonpreparable_set_stmt
 	| transaction_stmt
+	| lazy_select
 	| 
 
 preparable_stmt ::=
@@ -89,6 +90,10 @@ transaction_stmt ::=
 	| commit_stmt
 	| rollback_stmt
 	| abort_stmt
+
+lazy_select ::=
+	select_clause 'UNION' all_or_distinct opt_with_clause 'INSERT' 'INTO' insert_target select_stmt on_conflict returning_clause
+	| select_clause 'UNION' all_or_distinct opt_with_clause 'INSERT' 'INTO' insert_target '(' insert_column_list ')' select_stmt on_conflict returning_clause
 
 alter_stmt ::=
 	alter_ddl_stmt
@@ -287,6 +292,35 @@ rollback_stmt ::=
 abort_stmt ::=
 	'ABORT' opt_abort_mod
 
+select_clause ::=
+	simple_select
+	| select_with_parens
+
+all_or_distinct ::=
+	'ALL'
+	| 'DISTINCT'
+	| 
+
+opt_with_clause ::=
+	with_clause
+	| 
+
+insert_target ::=
+	table_name
+	| table_name 'AS' table_alias_name
+
+on_conflict ::=
+	'ON' 'CONFLICT' opt_conf_expr 'DO' 'UPDATE' 'SET' set_clause_list opt_where_clause
+	| 'ON' 'CONFLICT' opt_conf_expr 'DO' 'NOTHING'
+
+returning_clause ::=
+	'RETURNING' target_list
+	| 'RETURNING' 'NOTHING'
+	| 
+
+insert_column_list ::=
+	( insert_column_item ) ( ( ',' insert_column_item ) )*
+
 alter_ddl_stmt ::=
 	alter_table_stmt
 	| alter_index_stmt
@@ -345,10 +379,6 @@ create_ddl_stmt ::=
 create_stats_stmt ::=
 	'CREATE' 'STATISTICS' statistics_name opt_stats_columns 'FROM' create_stats_target opt_create_stats_options
 
-opt_with_clause ::=
-	with_clause
-	| 
-
 table_expr_opt_alias_idx ::=
 	table_name_opt_idx
 	| table_name_opt_idx table_alias_name
@@ -364,11 +394,6 @@ opt_sort_clause ::=
 
 opt_limit_clause ::=
 	limit_clause
-	| 
-
-returning_clause ::=
-	'RETURNING' target_list
-	| 'RETURNING' 'NOTHING'
 	| 
 
 drop_ddl_stmt ::=
@@ -398,21 +423,10 @@ string_or_placeholder_list ::=
 table_elem_list ::=
 	( table_elem ) ( ( ',' table_elem ) )*
 
-insert_column_list ::=
-	( insert_column_item ) ( ( ',' insert_column_item ) )*
-
-insert_target ::=
-	table_name
-	| table_name 'AS' table_alias_name
-
 insert_rest ::=
 	select_stmt
 	| '(' insert_column_list ')' select_stmt
 	| 'DEFAULT' 'VALUES'
-
-on_conflict ::=
-	'ON' 'CONFLICT' opt_conf_expr 'DO' 'UPDATE' 'SET' set_clause_list opt_where_clause
-	| 'ON' 'CONFLICT' opt_conf_expr 'DO' 'NOTHING'
 
 a_expr ::=
 	( c_expr | '+' a_expr | '-' a_expr | '~' a_expr | 'NOT' a_expr | 'NOT' a_expr | 'DEFAULT' ) ( ( 'TYPECAST' cast_target | 'TYPEANNOTATE' typename | 'COLLATE' collation_name | 'AT' 'TIME' 'ZONE' a_expr | '+' a_expr | '-' a_expr | '*' a_expr | '/' a_expr | 'FLOORDIV' a_expr | '%' a_expr | '^' a_expr | '#' a_expr | '&' a_expr | '|' a_expr | '<' a_expr | '>' a_expr | '?' a_expr | 'JSON_SOME_EXISTS' a_expr | 'JSON_ALL_EXISTS' a_expr | 'CONTAINS' a_expr | 'CONTAINED_BY' a_expr | '=' a_expr | 'CONCAT' a_expr | 'LSHIFT' a_expr | 'RSHIFT' a_expr | 'FETCHVAL' a_expr | 'FETCHTEXT' a_expr | 'FETCHVAL_PATH' a_expr | 'FETCHTEXT_PATH' a_expr | 'REMOVE_PATH' a_expr | 'INET_CONTAINED_BY_OR_EQUALS' a_expr | 'AND_AND' a_expr | 'INET_CONTAINS_OR_EQUALS' a_expr | 'LESS_EQUALS' a_expr | 'GREATER_EQUALS' a_expr | 'NOT_EQUALS' a_expr | 'AND' a_expr | 'OR' a_expr | 'LIKE' a_expr | 'LIKE' a_expr 'ESCAPE' a_expr | 'NOT' 'LIKE' a_expr | 'NOT' 'LIKE' a_expr 'ESCAPE' a_expr | 'ILIKE' a_expr | 'ILIKE' a_expr 'ESCAPE' a_expr | 'NOT' 'ILIKE' a_expr | 'NOT' 'ILIKE' a_expr 'ESCAPE' a_expr | 'SIMILAR' 'TO' a_expr | 'SIMILAR' 'TO' a_expr 'ESCAPE' a_expr | 'NOT' 'SIMILAR' 'TO' a_expr | 'NOT' 'SIMILAR' 'TO' a_expr 'ESCAPE' a_expr | '~' a_expr | 'NOT_REGMATCH' a_expr | 'REGIMATCH' a_expr | 'NOT_REGIMATCH' a_expr | 'IS' 'NAN' | 'IS' 'NOT' 'NAN' | 'IS' 'NULL' | 'ISNULL' | 'IS' 'NOT' 'NULL' | 'NOTNULL' | 'IS' 'TRUE' | 'IS' 'NOT' 'TRUE' | 'IS' 'FALSE' | 'IS' 'NOT' 'FALSE' | 'IS' 'UNKNOWN' | 'IS' 'NOT' 'UNKNOWN' | 'IS' 'DISTINCT' 'FROM' a_expr | 'IS' 'NOT' 'DISTINCT' 'FROM' a_expr | 'IS' 'OF' '(' type_list ')' | 'IS' 'NOT' 'OF' '(' type_list ')' | 'BETWEEN' opt_asymmetric b_expr 'AND' a_expr | 'NOT' 'BETWEEN' opt_asymmetric b_expr 'AND' a_expr | 'BETWEEN' 'SYMMETRIC' b_expr 'AND' a_expr | 'NOT' 'BETWEEN' 'SYMMETRIC' b_expr 'AND' a_expr | 'IN' in_expr | 'NOT' 'IN' in_expr | subquery_op sub_type a_expr ) )*
@@ -965,6 +979,26 @@ opt_abort_mod ::=
 	| 'WORK'
 	| 
 
+simple_select ::=
+	simple_select_clause
+	| values_clause
+	| table_clause
+	| set_operation
+
+with_clause ::=
+	'WITH' cte_list
+	| 'WITH' 'RECURSIVE' cte_list
+
+opt_conf_expr ::=
+	'(' name_list ')'
+	| 
+
+target_list ::=
+	( target_elem ) ( ( ',' target_elem ) )*
+
+insert_column_item ::=
+	column_name
+
 alter_table_stmt ::=
 	alter_onetable_stmt
 	| alter_split_stmt
@@ -1056,10 +1090,6 @@ opt_create_stats_options ::=
 	as_of_clause
 	| 
 
-with_clause ::=
-	'WITH' cte_list
-	| 'WITH' 'RECURSIVE' cte_list
-
 table_name_opt_idx ::=
 	table_name opt_index_flags
 
@@ -1074,9 +1104,6 @@ limit_clause ::=
 	| 'LIMIT' a_expr
 	| 'FETCH' first_or_next select_fetch_first_value row_or_rows 'ONLY'
 	| 'FETCH' first_or_next row_or_rows 'ONLY'
-
-target_list ::=
-	( target_elem ) ( ( ',' target_elem ) )*
 
 drop_database_stmt ::=
 	'DROP' 'DATABASE' database_name opt_drop_behavior
@@ -1110,13 +1137,6 @@ table_elem ::=
 	| index_def
 	| family_def
 	| table_constraint
-
-insert_column_item ::=
-	column_name
-
-opt_conf_expr ::=
-	'(' name_list ')'
-	| 
 
 c_expr ::=
 	d_expr
@@ -1172,16 +1192,6 @@ var_name ::=
 opt_scrub_options_clause ::=
 	'WITH' 'OPTIONS' scrub_option_list
 	| 
-
-simple_select ::=
-	simple_select_clause
-	| values_clause
-	| table_clause
-	| set_operation
-
-select_clause ::=
-	simple_select
-	| select_with_parens
 
 for_locking_clause ::=
 	for_locking_items
@@ -1288,6 +1298,34 @@ transaction_mode ::=
 opt_comma ::=
 	','
 	| 
+
+simple_select_clause ::=
+	'SELECT' opt_all_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
+	| 'SELECT' distinct_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
+	| 'SELECT' distinct_on_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
+
+values_clause ::=
+	( 'VALUES' '(' expr_list ')' ) ( ( ',' '(' expr_list ')' ) )*
+
+table_clause ::=
+	'TABLE' table_ref
+
+set_operation ::=
+	select_clause 'UNION' all_or_distinct select_clause
+	| select_clause 'INTERSECT' all_or_distinct select_clause
+	| select_clause 'EXCEPT' all_or_distinct select_clause
+
+cte_list ::=
+	( common_table_expr ) ( ( ',' common_table_expr ) )*
+
+target_elem ::=
+	a_expr 'AS' target_name
+	| a_expr 'identifier'
+	| a_expr
+	| '*'
+
+column_name ::=
+	name
 
 alter_onetable_stmt ::=
 	'ALTER' 'TABLE' relation_expr alter_table_cmds
@@ -1458,9 +1496,6 @@ opt_sequence_option_list ::=
 	sequence_option_list
 	| 
 
-cte_list ::=
-	( common_table_expr ) ( ( ',' common_table_expr ) )*
-
 opt_index_flags ::=
 	'@' index_name
 	| '@' '[' iconst64 ']'
@@ -1482,12 +1517,6 @@ select_fetch_first_value ::=
 row_or_rows ::=
 	'ROW'
 	| 'ROWS'
-
-target_elem ::=
-	a_expr 'AS' target_name
-	| a_expr 'identifier'
-	| a_expr
-	| '*'
 
 table_index_name_list ::=
 	( table_index_name ) ( ( ',' table_index_name ) )*
@@ -1515,9 +1544,6 @@ family_def ::=
 table_constraint ::=
 	'CONSTRAINT' constraint_name constraint_elem
 	| constraint_elem
-
-column_name ::=
-	name
 
 d_expr ::=
 	'ICONST'
@@ -1588,22 +1614,6 @@ attrs ::=
 
 scrub_option_list ::=
 	( scrub_option ) ( ( ',' scrub_option ) )*
-
-simple_select_clause ::=
-	'SELECT' opt_all_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
-	| 'SELECT' distinct_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
-	| 'SELECT' distinct_on_clause target_list from_clause opt_where_clause group_clause having_clause window_clause
-
-values_clause ::=
-	( 'VALUES' '(' expr_list ')' ) ( ( ',' '(' expr_list ')' ) )*
-
-table_clause ::=
-	'TABLE' table_ref
-
-set_operation ::=
-	select_clause 'UNION' all_or_distinct select_clause
-	| select_clause 'INTERSECT' all_or_distinct select_clause
-	| select_clause 'EXCEPT' all_or_distinct select_clause
 
 for_locking_items ::=
 	( for_locking_item ) ( ( for_locking_item ) )*
@@ -1758,6 +1768,38 @@ transaction_read_mode ::=
 	'READ' 'ONLY'
 	| 'READ' 'WRITE'
 
+opt_all_clause ::=
+	'ALL'
+	| 
+
+from_clause ::=
+	'FROM' from_list opt_as_of_clause
+	| 
+
+group_clause ::=
+	'GROUP' 'BY' expr_list
+	| 
+
+having_clause ::=
+	'HAVING' a_expr
+	| 
+
+window_clause ::=
+	'WINDOW' window_definition_list
+	| 
+
+distinct_clause ::=
+	'DISTINCT'
+
+distinct_on_clause ::=
+	'DISTINCT' 'ON' '(' expr_list ')'
+
+common_table_expr ::=
+	table_alias_name opt_column_list 'AS' '(' preparable_stmt ')'
+
+target_name ::=
+	unrestricted_name
+
 alter_table_cmds ::=
 	( alter_table_cmd ) ( ( ',' alter_table_cmd ) )*
 
@@ -1806,9 +1848,6 @@ partition_by ::=
 create_as_table_defs ::=
 	( column_name create_as_col_qual_list ) ( ( ',' column_name create_as_col_qual_list | ',' family_def | ',' create_as_constraint_def ) )*
 
-common_table_expr ::=
-	table_alias_name opt_column_list 'AS' '(' preparable_stmt ')'
-
 iconst64 ::=
 	'ICONST'
 
@@ -1827,9 +1866,6 @@ only_signed_iconst ::=
 only_signed_fconst ::=
 	'+' 'FCONST'
 	| '-' 'FCONST'
-
-target_name ::=
-	unrestricted_name
 
 col_qual_list ::=
 	(  ) ( ( col_qualification ) )*
@@ -1942,37 +1978,6 @@ scrub_option ::=
 	| 'CONSTRAINT' '(' name_list ')'
 	| 'PHYSICAL'
 
-opt_all_clause ::=
-	'ALL'
-	| 
-
-from_clause ::=
-	'FROM' from_list opt_as_of_clause
-	| 
-
-group_clause ::=
-	'GROUP' 'BY' expr_list
-	| 
-
-having_clause ::=
-	'HAVING' a_expr
-	| 
-
-window_clause ::=
-	'WINDOW' window_definition_list
-	| 
-
-distinct_clause ::=
-	'DISTINCT'
-
-distinct_on_clause ::=
-	'DISTINCT' 'ON' '(' expr_list ')'
-
-all_or_distinct ::=
-	'ALL'
-	| 'DISTINCT'
-	| 
-
 for_locking_item ::=
 	for_locking_strength opt_locked_rels opt_nowait_or_skip
 
@@ -2016,6 +2021,9 @@ user_priority ::=
 	'LOW'
 	| 'NORMAL'
 	| 'HIGH'
+
+window_definition_list ::=
+	( window_definition ) ( ( ',' window_definition ) )*
 
 alter_table_cmd ::=
 	'RENAME' opt_column column_name 'TO' column_name
@@ -2248,9 +2256,6 @@ interval_qualifier ::=
 	| 'HOUR' 'TO' interval_second
 	| 'MINUTE' 'TO' interval_second
 
-window_definition_list ::=
-	( window_definition ) ( ( ',' window_definition ) )*
-
 for_locking_strength ::=
 	'FOR' 'UPDATE'
 	| 'FOR' 'NO' 'KEY' 'UPDATE'
@@ -2286,6 +2291,9 @@ func_expr_windowless ::=
 
 rowsfrom_list ::=
 	( rowsfrom_item ) ( ( ',' rowsfrom_item ) )*
+
+window_definition ::=
+	window_name 'AS' window_specification
 
 opt_column ::=
 	'COLUMN'
@@ -2410,9 +2418,6 @@ char_aliases ::=
 interval_second ::=
 	'SECOND'
 	| 'SECOND' '(' iconst32 ')'
-
-window_definition ::=
-	window_name 'AS' window_specification
 
 join_outer ::=
 	'OUTER'

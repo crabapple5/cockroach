@@ -804,6 +804,7 @@ func newNameFromStr(s string) *tree.Name {
 %type <tree.Statement> update_stmt
 %type <tree.Statement> upsert_stmt
 %type <tree.Statement> use_stmt
+%type <tree.Statement> lazy_select
 
 %type <tree.Statement> reindex_stmt
 
@@ -820,7 +821,7 @@ func newNameFromStr(s string) *tree.Name {
 %type <*tree.LockingItem> for_locking_item
 %type <tree.LockingStrength> for_locking_strength
 %type <tree.LockingWaitPolicy> opt_nowait_or_skip
-%type <tree.SelectStatement> set_operation lazy_select
+%type <tree.SelectStatement> set_operation
 
 %type <tree.Expr> alter_column_default
 %type <tree.Direction> opt_asc_desc
@@ -1144,6 +1145,7 @@ stmt:
 | nonpreparable_set_stmt // help texts in sub-rule
 | transaction_stmt  // help texts in sub-rule
 | reindex_stmt
+| lazy_select
 | /* EMPTY */
   {
     $$.val = tree.Statement(nil)
@@ -6258,7 +6260,7 @@ simple_select:
 | values_clause        // EXTEND WITH HELP: VALUES
 | table_clause         // EXTEND WITH HELP: TABLE
 | set_operation
-| lazy_select
+
 
 // %Help: SELECT - retrieve rows from a data source and compute a result
 // %Category: DML
@@ -6350,17 +6352,21 @@ set_operation:
   }
 
 lazy_select:
-  opt_with_clause INSERT INTO insert_target insert_rest on_conflict returning_clause UNION all_or_distinct select_clause
+  select_clause UNION all_or_distinct opt_with_clause INSERT INTO insert_target select_stmt on_conflict returning_clause
   {
     $$.val = &tree.LazySelectUnionClause{
       Type:  tree.UnionOp,
-      Left:  &tree.Insert{
-        With: $1.with(),
-        Table: $4.tblExpr(),
-        OnConflict: $6.onConflict(),
-        Returning: $7.retClause()
-      },
-      Right: &tree.Select{Select: $4.selectStmt()},
+      Left:  &tree.Insert{With: $4.with(), Table: $7.tblExpr(), Rows: $8.slct(), OnConflict: $9.onConflict(), Returning: $10.retClause()},
+      Right: &tree.Select{Select: $1.selectStmt()},
+      All:   $3.bool(),
+    }
+  }
+| select_clause UNION all_or_distinct opt_with_clause INSERT INTO insert_target '(' insert_column_list ')' select_stmt on_conflict returning_clause
+  {
+    $$.val = &tree.LazySelectUnionClause{
+      Type:  tree.UnionOp,
+      Left:  &tree.Insert{With: $4.with(), Table: $7.tblExpr(), Columns: $9.nameList(), Rows: $11.slct(), OnConflict: $12.onConflict(), Returning: $13.retClause()},
+      Right: &tree.Select{Select: $1.selectStmt()},
       All:   $3.bool(),
     }
   }
