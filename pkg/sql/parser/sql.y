@@ -204,6 +204,11 @@ func (u *sqlSymUnion) with() *tree.With {
 func (u *sqlSymUnion) slct() *tree.Select {
     return u.val.(*tree.Select)
 }
+
+func (u *sqlSymUnion) unionUpdate() *tree.UpdateUnionClause {
+    return u.val.(*tree.UpdateUnionClause)
+}
+
 func (u *sqlSymUnion) selectStmt() tree.SelectStatement {
     return u.val.(tree.SelectStatement)
 }
@@ -805,6 +810,7 @@ func newNameFromStr(s string) *tree.Name {
 %type <tree.Statement> upsert_stmt
 %type <tree.Statement> use_stmt
 %type <tree.Statement> lazy_select
+%type <tree.Statement> update_union
 
 %type <tree.Statement> reindex_stmt
 
@@ -1145,7 +1151,7 @@ stmt:
 | nonpreparable_set_stmt // help texts in sub-rule
 | transaction_stmt  // help texts in sub-rule
 | reindex_stmt
-| lazy_select
+
 | /* EMPTY */
   {
     $$.val = tree.Statement(nil)
@@ -2746,6 +2752,8 @@ preparable_stmt:
 | truncate_stmt     // EXTEND WITH HELP: TRUNCATE
 | update_stmt       // EXTEND WITH HELP: UPDATE
 | upsert_stmt       // EXTEND WITH HELP: UPSERT
+| lazy_select
+| update_union
 
 // These are statements that can be used as a data source using the special
 // syntax with brackets. These are a subset of preparable_stmt.
@@ -2760,6 +2768,8 @@ row_source_extension_stmt:
 | show_stmt         // help texts in sub-rule
 | update_stmt       // EXTEND WITH HELP: UPDATE
 | upsert_stmt       // EXTEND WITH HELP: UPSERT
+| lazy_select
+| update_union
 
 explain_option_list:
   explain_option_name
@@ -5895,6 +5905,10 @@ insert_stmt:
     $$.val.(*tree.Insert).OnConflict = $6.onConflict()
     $$.val.(*tree.Insert).Returning = $7.retClause()
   }
+| opt_with_clause INSERT INTO insert_target update_union on_conflict returning_clause
+    {
+      $$.val = &tree.Insert{With: $1.with(), Table: $4.tblExpr(), Rows: &tree.Select{Select: $5.unionUpdate()}, OnConflict: $6.onConflict(), Returning: $7.retClause()}
+    }
 | opt_with_clause INSERT error // SHOW HELP: INSERT
 
 // %Help: UPSERT - create or replace rows in a table
@@ -6348,6 +6362,19 @@ set_operation:
       Left:  &tree.Select{Select: $1.selectStmt()},
       Right: &tree.Select{Select: $4.selectStmt()},
       All:   $3.bool(),
+    }
+  }
+
+
+update_union:
+  opt_with_clause UPDATE table_expr_opt_alias_idx SET set_clause_list opt_from_list opt_where_clause opt_sort_clause opt_limit_clause returning_clause
+  UNION all_or_distinct opt_with_clause UPDATE table_expr_opt_alias_idx SET set_clause_list opt_from_list opt_where_clause opt_sort_clause opt_limit_clause returning_clause
+  {
+    $$.val = &tree.UpdateUnionClause{
+      Type:  tree.UnionOp,
+      Left:  &tree.Update{With: $1.with(), Table: $3.tblExpr(), Exprs: $5.updateExprs(), From: $6.tblExprs(), Where: tree.NewWhere(tree.AstWhere, $7.expr()), OrderBy: $8.orderBy(), Limit: $9.limit(), Returning: $10.retClause()},
+      Right: &tree.Update{With: $13.with(), Table: $15.tblExpr(), Exprs: $17.updateExprs(), From: $18.tblExprs(), Where: tree.NewWhere(tree.AstWhere, $19.expr()), OrderBy: $20.orderBy(), Limit: $21.limit(), Returning: $22.retClause()},
+      All:   $12.bool(),
     }
   }
 

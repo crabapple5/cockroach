@@ -782,6 +782,9 @@ func (b *Builder) buildSelectStmt(
 	case *tree.LazySelectUnionClause:
 		return b.buildLazySelectUnionClause(stmt, desiredTypes, inScope)
 
+	case *tree.UpdateUnionClause:
+		return b.buildUpdateUnionClause(stmt, desiredTypes, inScope)
+
 	case *tree.ValuesClause:
 		return b.buildValuesClause(stmt, desiredTypes, inScope)
 
@@ -876,6 +879,9 @@ func (b *Builder) buildSelectStmtWithoutParens(
 	case *tree.LazySelectUnionClause:
 		b.rejectIfLocking(locking, "UNION/INTERSECT/EXCEPT")
 		outScope = b.buildLazySelectUnionClause(t, desiredTypes, inScope)
+	case *tree.UpdateUnionClause:
+		b.rejectIfLocking(locking, "UNION/INTERSECT/EXCEPT")
+		outScope = b.buildUpdateUnionClause(t, desiredTypes, inScope)
 	case *tree.ValuesClause:
 		b.rejectIfLocking(locking, "VALUES")
 		outScope = b.buildValuesClause(t, desiredTypes, inScope)

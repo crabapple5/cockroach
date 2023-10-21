@@ -262,6 +262,23 @@ func (b *Builder) buildStmt(
 		}
 		outScope = b.buildLazySelectUnionClause(stmt, desiredTypes, inScope)
 		return outScope
+
+	case *tree.UpdateUnionClause:
+		leftOutScope := b.processWiths(stmt.Left.With, inScope, func(inScope *scope) *scope {
+			return b.buildUpdate(stmt.Left, inScope)
+		})
+		if leftOutScope == nil {
+
+		}
+		rightOutScope := b.processWiths(stmt.Right.With, inScope, func(inScope *scope) *scope {
+			return b.buildUpdate(stmt.Right, inScope)
+		})
+		if rightOutScope == nil {
+
+		}
+		outScope = b.buildUpdateUnionClause(stmt, desiredTypes, inScope)
+		return outScope
+
 	case *tree.Select:
 		return b.buildSelect(stmt, noRowLocking, desiredTypes, inScope)
 

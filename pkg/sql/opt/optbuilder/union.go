@@ -54,6 +54,24 @@ func (b *Builder) buildLazySelectUnionClause(
 	return b.buildSetOp(clause.Type, clause.All, inScope, leftScope, rightScope)
 }
 
+// buildUpdateUnionClause builds a set of memo groups that represent the given update union
+// clause.
+//
+// See Builder.buildStmt for a description of the remaining input and
+// return values.
+func (b *Builder) buildUpdateUnionClause(
+	clause *tree.UpdateUnionClause, desiredTypes []*types.T, inScope *scope,
+) (outScope *scope) {
+	leftScope := b.buildStmt(clause.Left, desiredTypes, inScope)
+	// Try to propagate types left-to-right, if we didn't already have desired
+	// types.
+	if len(desiredTypes) == 0 {
+		desiredTypes = leftScope.makeColumnTypes()
+	}
+	rightScope := b.buildStmt(clause.Right, desiredTypes, inScope)
+	return b.buildSetOp(clause.Type, clause.All, inScope, leftScope, rightScope)
+}
+
 func (b *Builder) buildSetOp(
 	typ tree.UnionType, all bool, inScope, leftScope, rightScope *scope,
 ) (outScope *scope) {
